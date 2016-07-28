@@ -1,0 +1,226 @@
+C51 COMPILER V9.00   RS_485                                                                07/01/2013 23:46:04 PAGE 1   
+
+
+C51 COMPILER V9.00, COMPILATION OF MODULE RS_485
+OBJECT MODULE PLACED IN RS_485.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE RS_485.c BROWSE DEBUG OBJECTEXTEND
+
+line level    source
+
+   1          #include "reg52.h"
+   2          #define uchar unsigned char
+   3          #define uint unsigned int
+   4          //---------------I/O口位定义-----------------------
+   5          sbit led_show = P3^6;
+   6          sbit max485_R_W = P3^7;
+   7          //-------------------变量定义----------------------
+   8          uchar Num_50ms = 0;                     //50ms值
+   9          uchar Num_Hour = 0;                     //小时
+  10          uchar Num_minute = 0;           //分钟
+  11          uchar Num_second = 0;           //秒钟
+  12          uchar led_state = 0;            //LED显示方式
+  13          uchar Num_button = 0;           //外部中断按键次数
+  14          uchar student_ADR = 0;          //学生地址
+  15          uchar ser_data[16];                     //串口接收的数据
+  16          uchar send_data[16];            //串口发送的数据
+  17          uint m = 0;                                     //串口数据接收计数
+  18          uchar Num_check = 0;            //校验和
+  19          uchar xxx;
+  20          //------------------函数声明-----------------------
+  21          void interrupt_init();          //定时器初始化函数
+  22          void clock_pro();                       //内部时钟运行函数
+  23          void led_light(int x);          //二极管显示状态函数
+  24          uchar check_add(uchar xx);      //字节校验和计算函数
+  25          void command_1();                       //第一条命令执行函数
+  26          void command_2();                       //返回帧生成函数
+  27          void command_3();                       //返回帧发送函数
+  28          //------------------函数主体------------------------
+  29          void main()
+  30          {
+  31   1              led_show = 0;                   //LED初始闪烁状态
+  32   1              max485_R_W = 0;                 //初始接收模式
+  33   1              student_ADR = P2;               //读取学生地址
+  34   1              interrupt_init();               //定时器初始化  
+  35   1              while(1)
+  36   1              {                                                       
+  37   2              }
+  38   1      }
+  39          //------------------中断初始化程序---------------------
+  40          void interrupt_init()
+  41          {       
+  42   1              TMOD=0x21;      //时钟0为模式1，时钟1为模式2                    
+  43   1              TH1=0xFD;       //波特率9600                    
+  44   1              TL1=0xFD;
+  45   1              TR1=1;
+  46   1      
+  47   1              TH0=0x3C;               //50ms定时
+  48   1              TL0=0xB0;
+  49   1              TR0=1;
+  50   1              ET0=1;
+  51   1                      
+  52   1              IT0=1;          
+  53   1              EX0=1;                          
+  54   1                      
+  55   1              SM0=0;
+C51 COMPILER V9.00   RS_485                                                                07/01/2013 23:46:04 PAGE 2   
+
+  56   1              SM1=1;  //模式1（SM0=1,SM1=1）,
+  57   1              SM2=0;  //非多机通信（SM2=0）
+  58   1              REN=1;  //允许串口通信（REN=1）
+  59   1      
+  60   1              ES=1;
+  61   1              EA=1;   
+  62   1      }
+  63          //-----------------内部时钟函数-----------------------
+  64          void clock_pro()
+  65          {
+  66   1                      Num_second = Num_second+1;              
+  67   1                      if(Num_second==60)                              //60秒钟进位
+  68   1                      {
+  69   2                              Num_second=0;
+  70   2                              Num_minute=Num_minute+1;                        
+  71   2                              if(Num_minute==60)                      //60分钟进位
+  72   2                              {
+  73   3                                      Num_Hour=Num_Hour+1;
+  74   3                              }               
+  75   2                              if(Num_Hour==24)                        //24小时清零
+  76   2                              {
+  77   3                                      Num_Hour=0;
+  78   3                              }
+  79   2                      }
+  80   1      }
+  81          //---------------LED显示方式函数-----------------------
+  82          void led_light(led_state)
+  83          {
+  84   1              switch(led_state)
+  85   1              {
+  86   2                      case 2: led_show = 0;break;     
+  87   2                      case 1: led_show = 1;break;
+  88   2                      case 0: led_show = ~led_show;break;
+  89   2              }       
+  90   1      }
+  91          //------------第一条命令执行函数---------------------
+  92          void command_1()
+  93          {
+  94   1              EX0=1;                                          //开外部中断
+  95   1              led_state=2;                            //点亮二极管
+  96   1      }
+  97          //-------------返回帧生成函数--------------------------  
+  98          void command_2()
+  99          {
+ 100   1              send_data[0] = 0xAA;
+ 101   1              send_data[1] = 0x0A;
+ 102   1              send_data[2] = 0xF0;
+ 103   1              send_data[3] = student_ADR;
+ 104   1              send_data[4] = 0x07;
+ 105   1              send_data[5] = TL0;
+ 106   1              send_data[6] = TH0;
+ 107   1              send_data[7] = Num_50ms;
+ 108   1              send_data[8] = Num_second;
+ 109   1              send_data[9] = Num_minute;
+ 110   1              send_data[10] = Num_Hour;
+ 111   1              send_data[11] = ((send_data[1])+(send_data[2])+(send_data[3])+(send_data[4])+(send_data[5])+(send_data[6]
+             -)+(send_data[7])+(send_data[8])+(send_data[9])+(send_data[10]))%256;
+ 112   1              send_data[12] = 0x66;   
+ 113   1      }
+ 114          //--------------------返回帧发送函数-------------------
+ 115          void command_3()
+ 116          {
+C51 COMPILER V9.00   RS_485                                                                07/01/2013 23:46:04 PAGE 3   
+
+ 117   1              int nn;  
+ 118   1              led_state=1;                            //关闭二极管
+ 119   1              max485_R_W = 1;                         //485进入发送模式 
+ 120   1              for(nn=0;nn<13;)                        //依次发送13字节数据
+ 121   1              {
+ 122   2                      SBUF = send_data[nn++];
+ 123   2                      while(!TI)
+ 124   2                      {
+ 125   3                      }
+ 126   2                      TI=0;                                   //软件置0
+ 127   2              }
+ 128   1              max485_R_W = 0;                         //485进入接收模式
+ 129   1              Num_button=1;                           //为下一次记录时间做准备
+ 130   1              EX0=1;                                          //开外部中断
+ 131   1      }                                               
+ 132          //------------定时器0中断服务程序---------------------
+ 133          void inter_0(void)      interrupt 1     //定时器0的中断服务程序
+ 134          {       
+ 135   1              Num_50ms++;
+ 136   1              if(Num_50ms==10)
+ 137   1              {
+ 138   2                      led_light(led_state);           
+ 139   2              }
+ 140   1              if(Num_50ms==20)
+ 141   1              {               
+ 142   2                      clock_pro();
+ 143   2                      Num_50ms = 0;
+ 144   2                      led_light(led_state);           
+ 145   2              }                                                                                               
+ 146   1      }
+ 147          //------------外部中断0中断服务程序---------------------
+ 148          void int0(void) interrupt 0     //外部中断0的中断服务程序
+ 149          {
+ 150   1              EX0=0;                                          //关闭外部中断
+ 151   1              Num_button++;
+ 152   1              switch(Num_button)
+ 153   1              {
+ 154   2                      case 1:led_state = 1;break;
+ 155   2                      case 2: command_2();break;
+ 156   2              }
+ 157   1      }
+ 158          
+ 159          //------------串口中断服务程序---------------------
+ 160          void ser() interrupt 4                  //串口中断0的中断服务程序
+ 161          {
+ 162   1              RI=0;                                           //提取缓冲区的数据
+ 163   1              if(ser_data[0]!=0xAA)
+ 164   1              {
+ 165   2                      xxx=SBUF;
+ 166   2                      if(xxx==0xAA)
+ 167   2                      {
+ 168   3                              ser_data[0]=SBUF;       //收到帧起始符号，开始存取收到的数据
+ 169   3                      }
+ 170   2              }       
+ 171   1              if(ser_data[0]==0xAA)
+ 172   1              {
+ 173   2                      ser_data[m]=SBUF;               //依次接收所有后续字符
+ 174   2                      m++;                                    //收到的命令处理完成后记得m要置0 ser_data也要至0
+ 175   2              }
+ 176   1              if(ser_data[m-1]==0x66)         //接收到结束字符0x66
+ 177   1              {
+ 178   2                      if((ser_data[2]==student_ADR)||(ser_data[2]==0xFF))             //确认是本机地址或广播后进行校验和计算
+C51 COMPILER V9.00   RS_485                                                                07/01/2013 23:46:04 PAGE 4   
+
+ 179   2                      {
+ 180   3                              Num_check=(ser_data[1]+ser_data[2]+ser_data[3]+ser_data[4])%256;                                                
+ 181   3                              if(Num_check==ser_data[5])                                                      //校验和验证
+ 182   3                              {
+ 183   4                                      switch(ser_data[4])
+ 184   4                                      {
+ 185   5                                              case 0x01:command_1();  break;
+ 186   5                                              case 0x03:command_3();  break;
+ 187   5                                      }                       
+ 188   4                              }
+ 189   3                      }
+ 190   2                      for(m=0;m<16;m++)               //完成对命令的处理之后清除记录，为下一次存储做准备
+ 191   2                      {
+ 192   3                              ser_data[m]=0;
+ 193   3                      }
+ 194   2                      m=0;
+ 195   2              }
+ 196   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    491    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     43    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
